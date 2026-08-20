@@ -2,10 +2,8 @@ from abc import ABC, abstractmethod
 from enum import Enum
 from app.domain.asset import Asset, AssetType
 from decimal import Decimal
+from app.domain.exceptions import InvalidOrderError, UnsupportedOrderTypeError
 
-class InvalidOrderError(Exception):
-    """Custom exception for invalid order types."""
-    pass
 
 class OrderType(Enum):
     BUY = "Buy"
