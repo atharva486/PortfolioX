@@ -8,15 +8,15 @@ class Asset(ABC):
 
     @property
     @abstractmethod
-    def name(self):
+    def name(self)->str:
         pass
     @property
     @abstractmethod
-    def symbol(self):
+    def symbol(self)->str:
         pass
     @property
     @abstractmethod
-    def current_price(self):
+    def current_price(self)->Decimal:
         pass
 
     @property
@@ -32,21 +32,21 @@ class Stock(Asset):
         self._sector=sector
 
     @property
-    def name(self):
+    def name(self)->str:
         return self._name
 
     @property
-    def symbol(self):
+    def symbol(self)->str:
         return self._symbol
 
     @property
-    def current_price(self):
+    def current_price(self)->Decimal:
         return self._current_price
     @property
-    def sector(self):
+    def sector(self)->str:
         return self._sector
     @property
-    def asset_type(self):
+    def asset_type(self)->AssetType:
         return AssetType.STOCK
 
     @current_price.setter
@@ -63,15 +63,15 @@ class Bond(Asset):
         self._coupon_rate = coupon_rate
 
     @property
-    def name(self):
+    def name(self)->str:
         return self._name
 
     @property
-    def symbol(self):
+    def symbol(self)->str:
         return self._symbol
 
     @property
-    def current_price(self):
+    def current_price(self)->Decimal:
         return self._current_price
 
     @current_price.setter
@@ -81,9 +81,9 @@ class Bond(Asset):
         self._current_price = new_price
 
     @property
-    def coupon_rate(self):
+    def coupon_rate(self)->Decimal:
         return self._coupon_rate
 
     @property
-    def asset_type(self):
+    def asset_type(self)->AssetType:
         return AssetType.BOND
