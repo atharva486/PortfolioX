@@ -10,3 +10,11 @@ class InvalidOrderError(PortfolioXError):
 class UnsupportedOrderTypeError(PortfolioXError):
     """Raised when an unrecognized order type is encountered."""
     pass
+
+class InsufficientFundsError(PortfolioXError):
+    """Raised when an account does not have enough funds to execute an order."""
+    pass
+
+class InsufficientHoldingsError(PortfolioXError):
+    """Raised when an account does not have enough holdings to execute a sell order."""
+    pass
