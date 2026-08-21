@@ -7,7 +7,7 @@ from app.domain.exceptions import InsufficientFundsError, InsufficientHoldingsEr
 
 @pytest.fixture
 def sample_stock():
-    return Stock("Apple", "AAPL", Decimal("150.00"), "Tech")
+    return Stock("Apple", "AAPL", "Tech")
 
 @pytest.fixture
 def empty_account():

@@ -6,7 +6,7 @@ from app.domain.order import MarketOrder, LimitOrder, OrderType, InvalidOrderErr
 @pytest.fixture
 def sample_stock():
     # Pytest fixtures let us reuse this object in multiple tests!
-    return Stock("Apple", "AAPL", Decimal("150.00"), "Tech")
+    return Stock("Apple", "AAPL",  "Tech")
 
 def test_order_quantity_validation(sample_stock):
     """PORTX-2: Ensure zero or negative quantities raise InvalidOrderError."""

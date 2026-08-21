@@ -20,7 +20,7 @@ class Account():
                 self.holdings[symbol]["quantity"] = self.holdings[symbol]["quantity"] + order.quantity
                 self.holdings[symbol]["avg_price"] = new_avg_price
             else:
-                self.holdings[symbol] = {"quantity": order.quantity, "avg_price": Decimal(current_market_price)}
+                self.holdings[symbol] = {"quantity": order.quantity, "avg_price": Decimal(current_market_price), "asset":order.asset.asset_type}
         elif order.order_type == OrderType.SELL:
             if symbol not in self.holdings or self.holdings[symbol]["quantity"] < order.quantity:
                 raise InsufficientHoldingsError("Insufficient holdings to execute the sell order.")
