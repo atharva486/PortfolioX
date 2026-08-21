@@ -1,4 +1,3 @@
-
 # Architecture Decision Records (ADRs) - PortfolioX
 
 ## 1. Use of `Decimal` over `float` for Monetary Values
