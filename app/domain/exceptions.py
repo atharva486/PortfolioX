@@ -18,3 +18,7 @@ class InsufficientFundsError(PortfolioXError):
 class InsufficientHoldingsError(PortfolioXError):
     """Raised when an account does not have enough holdings to execute a sell order."""
     pass
+
+class MissingPriceError(PortfolioXError):
+    """Raised when a live price for a symbol is not available."""
+    pass
