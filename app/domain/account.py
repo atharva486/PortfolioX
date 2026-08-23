@@ -2,7 +2,8 @@ from decimal import Decimal
 from app.domain.order import Order,OrderType
 from app.domain.exceptions import InsufficientFundsError, InsufficientHoldingsError
 class Account():
-    def __init__(self,balance:Decimal):
+    def __init__(self,balance:Decimal,id:int):
+        self.id=id
         self.balance=balance
         self.holdings={}
 
