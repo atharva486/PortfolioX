@@ -7,7 +7,7 @@ from app.domain.exceptions import MissingPriceError
 @pytest.fixture
 def populated_account():
     # Setup an account with $5,000 cash and some existing stock
-    acc = Account(balance=Decimal("5000.00"))
+    acc = Account(balance=Decimal("5000.00"), id=1)
     acc.holdings = {
         "AAPL": {"quantity": 10, "avg_price": Decimal("150.00")}, # Cost basis: $1500
         "TSLA": {"quantity": 5, "avg_price": Decimal("200.00")}   # Cost basis: $1000
