@@ -9,3 +9,8 @@
 * **Context:** Initially, `Asset` models (Stock/Bond) stored a `current_price` attribute. However, prices are highly volatile and belong to the "Market", not the "Asset". 
 * **Decision:** We removed `current_price` from the core `Asset` classes. Assets are now treated purely as descriptive metadata (symbol, name, type). Prices are now dynamically injected into the `Account` and `Portfolio` methods at runtime.
 * **Consequence:** This enforces a **Single Source of Truth (SSOT)**. It completely eliminates the risk of "stale data" bugs where a user's portfolio value could be calculated using outdated prices from when the asset was originally instantiated.
+
+
+# why the albemic is chosen for the database control history 
+# why the sql alchemy being used
+# why the for developing stage sqlite being used

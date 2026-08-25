@@ -6,6 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 from app.models.base import Base
 from app.models.account_model import AccountModel
 from app.models.holding_model import HoldingModel
+from app.models.asset_model import AssetModel
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -73,7 +74,7 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection, target_metadata=target_metadata,render_as_batch=True
         )
 
         with context.begin_transaction():
