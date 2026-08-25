@@ -33,11 +33,3 @@ def test_bond_initialization_and_properties():
     assert bond.symbol == "UST10Y"
     assert bond.coupon_rate == Decimal("0.045")
     assert bond.asset_type == AssetType.BOND
-
-def test_price_setter_validation():
-    """Verify that price updates work, but negative prices raise a ValueError."""
-    stock = Stock("Tesla", "TSLA",  "Auto")
-    
-    # Valid update
-    
-    # Invalid update

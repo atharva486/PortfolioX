@@ -26,3 +26,8 @@
 ### 6. Why we use SQLite for Development and Testing
 * **The Decision:** We are using SQLite (specifically `sqlite:///:memory:` for tests) during the development stage.
 * **The Reasoning:** SQLite requires zero configuration—no Docker containers, no dedicated database servers, and no complex credentials. This removes friction during early development. More importantly, using an in-memory SQLite database for Pytest allows us to spin up a fresh, isolated database in milliseconds for every single test, ensuring tests never corrupt each other's data and run incredibly fast.
+
+### 7. Why the Asset model intentionally excludes a `current_price` field
+* **The Question:** If we need prices to calculate portfolio value, why don't we just save `current_price` directly on the `Asset` object or in the database?
+* **The Decision:** We explicitly decided *never* to store `current_price` as a permanent field on the `Asset` domain object or in the database tables.
+* **The Reasoning:** A stock's price changes every millisecond. It is highly volatile market data, not a fundamental part of the asset's identity (like its ticker symbol or company name). If we save a price to the database or attach it to the asset's core identity, it instantly becomes outdated ("stale"), creating a dangerous, duplicate source of truth. Instead, whenever we need to calculate a portfolio's total value or execute a trade, we will explicitly inject real-time prices (e.g., passing a `live_prices` dictionary fetched fresh from a market data API). This guarantees our financial math is always based on reality, not a frozen snapshot.

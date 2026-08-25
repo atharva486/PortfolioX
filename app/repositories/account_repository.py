@@ -42,7 +42,7 @@ class AccountRepository:
     def get_all_accounts(self)->list[AccountModel]:
         return self.session.query(AccountModel).all()
 
-    def  _to_domain(self,account:AccountModel)->Account:
+    def  _to_domain(self,account:AccountModel)->Account|None:
         if account is not None:
             domain_account = Account(balance =Decimal(str(account.balance)),id = account.id)
             holdings={}
@@ -55,6 +55,7 @@ class AccountRepository:
                 }
             domain_account.holdings = holdings
             return domain_account
+        return None
 
     def get_domain_account(self,account_id:int)->Account:
         raw_account  = self.get_account(account_id = account_id)
