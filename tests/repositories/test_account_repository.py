@@ -3,9 +3,13 @@ from decimal import Decimal
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from app.domain.asset import Stock
 from app.models.account_model import AccountModel
 from app.models.holding_model import HoldingModel
 from app.models.asset_model import AssetModel
+
+from app.domain.order import MarketOrder
+from app.domain.order import OrderType
 
 # Import your Base so we can create tables in memory!
 from app.models.base import Base # Adjust this import if your Base is somewhere else
@@ -53,3 +57,50 @@ def test_get_account(db_session):
     assert fetched_account is not None
     assert fetched_account.id == new_account.id
     assert fetched_account.balance == Decimal("1500.00")
+
+
+def test_get_domain_account_and_place_order(db_session):
+    # 1. SETUP: Put some raw data in the database
+    repo = AccountRepository(db_session)
+    
+    db_account = repo.create_account(balance=Decimal("10000.00"))
+    
+    apple_asset = AssetModel(symbol="AAPL", asset_type="STOCK", company_name="Apple Inc.")
+    db_session.add(apple_asset)
+    db_session.commit()
+    
+    holding = HoldingModel(
+        account_id=db_account.id, 
+        symbol="AAPL", 
+        quantity=Decimal("10"), 
+        avg_price=Decimal("150.00")
+    )
+    db_session.add(holding)
+    db_session.commit()
+
+    # 2. THE TEST: Fetch the domain account
+    domain_account = repo.get_domain_account(db_account.id)
+
+    assert domain_account is not None
+    assert domain_account.balance == Decimal("10000.00")
+    assert "AAPL" in domain_account.holdings
+    
+    # 3. THE ULTIMATE TEST: Use MarketOrder
+    new_apple_stock = Stock(symbol="AAPL", name="Apple Inc.", sector="Tech")
+    
+    # ✅ Create a MarketOrder instead of the abstract Order
+    buy_order = MarketOrder(
+        asset=new_apple_stock, 
+        quantity=Decimal("5"), 
+        order_type=OrderType.BUY
+    )
+    
+    # Pass the MarketOrder into your method
+    result = domain_account.place_order(order=buy_order, current_market_price=Decimal("160.00"))
+    
+    # 4. ASSERTIONS: Did the math work?
+    assert "Order executed" in result
+    assert domain_account.balance == Decimal("9200.00") # 10000 - (5 * 160)
+    assert domain_account.holdings["AAPL"]["quantity"] == Decimal("15")
+
+    print("\n✅ THE MAPPER WORKS! Domain Logic successfully ran on Database Data.")
