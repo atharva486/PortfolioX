@@ -6,6 +6,7 @@ from app.domain.account import Account
 from app.models.account_model import AccountModel
 from app.domain.asset import Asset,Stock,Bond
 from app.models.asset_model import AssetModel
+from app.models.holding_model import HoldingModel
 
 
 class AccountRepository:
