@@ -31,3 +31,16 @@
 * **The Question:** If we need prices to calculate portfolio value, why don't we just save `current_price` directly on the `Asset` object or in the database?
 * **The Decision:** We explicitly decided *never* to store `current_price` as a permanent field on the `Asset` domain object or in the database tables.
 * **The Reasoning:** A stock's price changes every millisecond. It is highly volatile market data, not a fundamental part of the asset's identity (like its ticker symbol or company name). If we save a price to the database or attach it to the asset's core identity, it instantly becomes outdated ("stale"), creating a dangerous, duplicate source of truth. Instead, whenever we need to calculate a portfolio's total value or execute a trade, we will explicitly inject real-time prices (e.g., passing a `live_prices` dictionary fetched fresh from a market data API). This guarantees our financial math is always based on reality, not a frozen snapshot.
+
+
+
+# Database Architecture Decision: Neon Connection Pooling Configuration
+
+## 1. Application Traffic Requires High Concurrency (Neon Pool: ON)
+Our web application handles rapid, simultaneous user requests that execute quick SQL queries. Keeping Neon’s connection pooler active allows hundreds of application instances to safely reuse a small, shared pool of actual database processes without exhausting PostgreSQL's `max_connections` limit.
+
+## 2. Alembic Migrations Require Strict Stateful Isolation (Neon Pool: OFF)
+Alembic executes sequential schema updates (DDL) wrapped inside stateful transactions that rely on persistent session elements like table locks and advisory locks. Because Neon's pooler operates in **Transaction Pooling mode**, it dynamically detaches and reassigns database backend processes between queries, which breaks Alembic’s session continuity and triggers immediate transaction/lock loss errors.
+
+## 3. Deployment Resource Cleanup via Single-Use Connections (SQLAlchemy Pool: OFF / NullPool)
+Migrations are short-lived, single-user administrative tasks rather than long-running web servers. Forcing SQLAlchemy to use `NullPool` combined with Neon’s direct URL ensures that Alembic opens exactly one private, uninterrupted TCP connection directly to the Postgres engine and immediately terminates it upon completion, preventing dangling connections and resource leaks.

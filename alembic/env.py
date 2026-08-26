@@ -1,6 +1,7 @@
 
 import os
 import sys
+import dotenv
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from app.models.base import Base
@@ -66,6 +67,10 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+    dotenv.load_dotenv()
+    direct_url = os.environ.get("DIRECT_URL")
+    if direct_url:
+        config.set_main_option("sqlalchemy.url",direct_url)
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

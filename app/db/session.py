@@ -1,22 +1,20 @@
-
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
+import os
+import dotenv 
 
-
-SQLACHEMY_DATABASE_URL = "sqlite:///./portfoliox.db"
+dotenv.load_dotenv()
+DATABASE_URL = os.environ.get("DATABASE_URL","sqlite:///portfoliox.db")
+engine_args = {}
+if "sqlite" in DATABASE_URL:
+    engine_args["check_same_thread"] = False
 
 engine = create_engine(
-    SQLACHEMY_DATABASE_URL, 
-    connect_args={"check_same_thread": False},
+    
+    DATABASE_URL, 
+    connect_args=engine_args,
     echo=True
 )
-
-@event.listens_for(engine, "connect", named=True)
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
-
 
 SessionLocal  = sessionmaker(autocommit = False, autoflush = False, bind = engine)
 
