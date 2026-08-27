@@ -1,7 +1,8 @@
 
 from decimal import Decimal
+from typing import cast
+
 from sqlalchemy.orm import Session
-from app.db.session import SessionLocal
 from app.domain.account import Account
 from app.models.account_model import AccountModel
 from app.domain.asset import Asset,Stock,Bond
@@ -17,16 +18,17 @@ class AccountRepository:
 
 
     def stock_or_bond(self,asset:AssetModel):
-        if asset.asset_type == "BOND":
+        asset_type = cast(str, asset.asset_type)
+        if asset_type == "BOND":
             return Bond(
-                symbol=asset.symbol,
-                name=asset.company_name,
+                symbol=cast(str, asset.symbol),
+                name=cast(str, asset.company_name),
                 coupon_rate=Decimal("0.0")
             )
         else:
             return Stock(
-                symbol=asset.symbol,
-                name=asset.company_name,
+                symbol=cast(str, asset.symbol),
+                name=cast(str, asset.company_name),
                 sector="Unknown"
             )
 
@@ -45,7 +47,7 @@ class AccountRepository:
 
     def  _to_domain(self,account:AccountModel)->Account|None:
         if account is not None:
-            domain_account = Account(balance =Decimal(str(account.balance)),id = account.id)
+            domain_account = Account(balance =Decimal(str(account.balance)),id = cast(int, account.id))
             holdings={}
             for holding in account.holdings:
                 asset_val = self.stock_or_bond(holding.asset)
@@ -58,6 +60,6 @@ class AccountRepository:
             return domain_account
         return None
 
-    def get_domain_account(self,account_id:int)->Account:
+    def get_domain_account(self,account_id:int)->Account|None:
         raw_account  = self.get_account(account_id = account_id)
         return self._to_domain(account=raw_account)
