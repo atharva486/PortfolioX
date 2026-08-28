@@ -11,7 +11,6 @@ from app.models.holding_model import HoldingModel
 
 
 class AccountRepository:
-
     
     def __init__(self,session : Session):
         self.session = session

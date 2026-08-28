@@ -1,13 +1,11 @@
 from fastapi import FastAPI,Depends
 from app.db.session import get_db
 from sqlalchemy import text
-
 from sqlalchemy.orm import Session
-
-# Note: Adjust this import path if your file is named something else!
-# Assuming your repository is in app/repositories/account_repository.py
-from app.repositories.account_repository import AccountRepository
+from app.api.routes.accounts import router as account_router
 app = FastAPI()
+
+app.include_router(account_router)
 
 @app.get("/health")
 def get_root():
