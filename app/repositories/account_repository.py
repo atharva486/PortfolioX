@@ -62,3 +62,39 @@ class AccountRepository:
     def get_domain_account(self,account_id:int)->Account|None:
         raw_account  = self.get_account(account_id = account_id)
         return self._to_domain(account=raw_account)
+
+    def save(self,domain_account:Account):
+        account = self.get_account(domain_account.id)
+        if not account:
+            return None
+        account.balance =domain_account.balance
+        # 3. Update or Insert Holdings
+        for symbol, holding in domain_account.holdings.items():
+            # Safely extract quantity and avg_price whether your domain uses dicts or objects
+            quantity = holding.quantity if hasattr(holding, 'quantity') else holding.get('quantity', 0)
+            avg_price = holding.avg_price if hasattr(holding, 'avg_price') else holding.get('avg_price', Decimal("0.0"))
+
+            # Check if this holding already exists in the database
+            holding_model = self.session.query(HoldingModel).filter(
+                HoldingModel.account_id == domain_account.id,
+                HoldingModel.symbol == symbol
+            ).first()
+
+            if holding_model:
+                # Update existing holding
+                holding_model.quantity = quantity
+                holding_model.avg_price = avg_price
+            else:
+                # Insert brand new holding
+                new_holding = HoldingModel(
+                    account_id=domain_account.id,
+                    symbol=symbol,
+                    quantity=quantity,
+                    avg_price=avg_price
+                )
+                self.session.add(new_holding)
+
+        # 4. Save everything to PostgreS
+        self.session.commit()
+
+

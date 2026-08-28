@@ -7,9 +7,9 @@ class Account():
         self.balance=balance
         self.holdings={}
 
-    def place_order(self,order:Order,current_market_price:Decimal)->str:
+    def place_order(self,order:Order,current_market_price:Decimal)->bool:
         if not  order.can_execute(current_market_price):
-            return "Order Pending"
+            return False
         symbol = order.asset.symbol
         total_cost = order.quantity * current_market_price
         if order.order_type== OrderType.BUY:
@@ -29,6 +29,6 @@ class Account():
             self.holdings[symbol]["quantity"] -= order.quantity
             if self.holdings[symbol]["quantity"] == 0:
                 del self.holdings[symbol]
-        return f"Order executed: {order.order_type.value} {order.quantity} of {order.asset.symbol} at {current_market_price}"
+        return True
 
     

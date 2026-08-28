@@ -8,6 +8,9 @@ from app.domain.exceptions import InvalidOrderError, UnsupportedOrderTypeError
 class OrderType(Enum):
     BUY = "Buy"
     SELL = "Sell"
+class OrderSide(Enum):
+    MARKET = "Market"
+    LIMIT = "Limit"
 
 class Order(ABC):
     def __init__(self,asset:Asset,quantity:int,order_type:OrderType ):
@@ -20,6 +23,9 @@ class Order(ABC):
     @abstractmethod
     def can_execute(self,current_market_price)->bool:
         pass
+    @abstractmethod
+    def order_side(self)->OrderSide:
+        pass
 
 class MarketOrder(Order):
     def __init__(self,asset:Asset,quantity:int,order_type:OrderType):
@@ -27,6 +33,8 @@ class MarketOrder(Order):
 
     def can_execute(self,current_market_price:Decimal)->bool:
         return True
+    def order_side(self) -> OrderSide:
+        return OrderSide.MARKET
 
 class LimitOrder(Order):
     def __init__(self,asset:Asset,quantity:int,order_type:OrderType,limit_price:Decimal):
@@ -40,5 +48,8 @@ class LimitOrder(Order):
             return current_market_price >= self._limit_price
         else:
             raise InvalidOrderError("Invalid order type.")
+
+    def order_side(self) -> OrderSide:
+        return OrderSide.LIMIT
 
     
