@@ -27,8 +27,8 @@ def upgrade() -> None:
         batch_op.alter_column('company_name',
                existing_type=sa.VARCHAR(),
                nullable=False)
-        batch_op.create_check_constraint(batch_op.f('ck_assets_check_asset_has_couponRate'), "NOT ( asset_type == 'AssetType.BOND' AND coupon_rate IS NULL)")
-        batch_op.create_check_constraint(batch_op.f('ck_assets_check_asset_has_sector'), "NOT ( asset_type == 'AssetType.STOCK' AND sector IS NULL)")
+        batch_op.create_check_constraint(batch_op.f('ck_assets_check_asset_has_couponRate'), "NOT ( asset_type = 'AssetType.BOND,value' AND coupon_rate IS NULL)")
+        batch_op.create_check_constraint(batch_op.f('ck_assets_check_asset_has_sector'), "NOT ( asset_type = 'AssetType.STOCKvalue' AND sector IS NULL)")
 
     # ### end Alembic commands ###
 
