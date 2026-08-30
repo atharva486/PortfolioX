@@ -17,7 +17,7 @@ class OrderRepository:
         self.session =session
 
     def create_order(self,order_type:OrderType,quantity:int,order_side:OrderSide,limit_price:Decimal|None,asset:Asset):
-        if order_type == OrderType.LIMIT.value and limit_price is not None:
+        if order_type.value == OrderType.LIMIT.value and limit_price is not None:
             return LimitOrder(asset,quantity,order_side,limit_price)
         else:
             return MarketOrder(asset,quantity,order_side)
