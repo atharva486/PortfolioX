@@ -1,7 +1,7 @@
 import pytest
 from decimal import Decimal
 from app.domain.asset import Stock
-from app.domain.order import MarketOrder, LimitOrder, OrderType, InvalidOrderError
+from app.domain.order import MarketOrder, LimitOrder, OrderSide, InvalidOrderError
 
 @pytest.fixture
 def sample_stock():
@@ -11,20 +11,20 @@ def sample_stock():
 def test_order_quantity_validation(sample_stock):
     """PORTX-2: Ensure zero or negative quantities raise InvalidOrderError."""
     with pytest.raises(InvalidOrderError, match="Quantity must be a positive integer"):
-        MarketOrder(sample_stock, 0, OrderType.BUY)
+        MarketOrder(sample_stock, 0, OrderSide.BUY)
         
     with pytest.raises(InvalidOrderError):
-        MarketOrder(sample_stock, -5, OrderType.SELL)
+        MarketOrder(sample_stock, -5, OrderSide.SELL)
 
 def test_market_order_execution(sample_stock):
     """Market orders should always be ready to execute."""
-    order = MarketOrder(sample_stock, 10, OrderType.BUY)
+    order = MarketOrder(sample_stock, 10, OrderSide.BUY)
     assert order.can_execute(Decimal("160.00")) is True
     assert order.can_execute(Decimal("10.00")) is True
 
 def test_limit_order_buy_logic(sample_stock):
     """Limit BUY: only execute if market price is <= limit price."""
-    order = LimitOrder(sample_stock, 10, OrderType.BUY, limit_price=Decimal("150.00"))
+    order = LimitOrder(sample_stock, 10, OrderSide.BUY, limit_price=Decimal("150.00"))
     
     # Market drops to 149 - Execute!
     assert order.can_execute(Decimal("149.00")) is True
@@ -35,7 +35,7 @@ def test_limit_order_buy_logic(sample_stock):
 
 def test_limit_order_sell_logic(sample_stock):
     """Limit SELL: only execute if market price is >= limit price."""
-    order = LimitOrder(sample_stock, 10, OrderType.SELL, limit_price=Decimal("150.00"))
+    order = LimitOrder(sample_stock, 10, OrderSide.SELL, limit_price=Decimal("150.00"))
     
     # Market drops to 149 - Do NOT execute
     assert order.can_execute(Decimal("149.00")) is False

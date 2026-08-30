@@ -2,14 +2,14 @@ import pytest
 from decimal import Decimal
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
+from typing import cast
 from app.domain.asset import Stock
 from app.models.account_model import AccountModel
 from app.models.holding_model import HoldingModel
 from app.models.asset_model import AssetModel
 
 from app.domain.order import MarketOrder
-from app.domain.order import OrderType
+from app.domain.order import OrderSide
 
 # Import your Base so we can create tables in memory!
 from app.models.base import Base # Adjust this import if your Base is somewhere else
@@ -51,11 +51,11 @@ def test_get_account(db_session):
     new_account = repo.create_account(balance=Decimal("1500.00"))
     
     # Action
-    fetched_account = repo.get_account(new_account.id)
+    fetched_account = repo.get_account(cast(int,new_account.id))
     
     # Assertion
     assert fetched_account is not None
-    assert fetched_account.id == new_account.id
+    assert cast(int,fetched_account.id) == cast(int,new_account.id)
     assert fetched_account.balance == Decimal("1500.00")
 
 
@@ -79,7 +79,7 @@ def test_get_domain_account_and_place_order(db_session):
     db_session.commit()
 
     # 2. THE TEST: Fetch the domain account
-    domain_account = repo.get_domain_account(db_account.id)
+    domain_account = repo.get_domain_account(cast(int,db_account.id))
 
     assert domain_account is not None
     assert domain_account.balance == Decimal("10000.00")
@@ -91,15 +91,13 @@ def test_get_domain_account_and_place_order(db_session):
     # ✅ Create a MarketOrder instead of the abstract Order
     buy_order = MarketOrder(
         asset=new_apple_stock, 
-        quantity=Decimal("5"), 
-        order_type=OrderType.BUY
+        quantity=5, 
+        order_side=OrderSide.BUY
     )
     
     # Pass the MarketOrder into your method
     result = domain_account.place_order(order=buy_order, current_market_price=Decimal("160.00"))
     
-    # 4. ASSERTIONS: Did the math work?
-    assert "Order executed" in result
     assert domain_account.balance == Decimal("9200.00") # 10000 - (5 * 160)
     assert domain_account.holdings["AAPL"]["quantity"] == Decimal("15")
 

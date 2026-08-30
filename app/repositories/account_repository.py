@@ -22,13 +22,13 @@ class AccountRepository:
             return Bond(
                 symbol=cast(str, asset.symbol),
                 name=cast(str, asset.company_name),
-                coupon_rate=Decimal("0.0")
+                coupon_rate=cast(Decimal,asset.coupon_rate)
             )
         else:
             return Stock(
                 symbol=cast(str, asset.symbol),
                 name=cast(str, asset.company_name),
-                sector="Unknown"
+                sector=cast(str,asset.sector)
             )
 
     def create_account(self,balance:Decimal)->AccountModel:
@@ -68,24 +68,19 @@ class AccountRepository:
         if not account:
             return None
         account.balance =domain_account.balance
-        # 3. Update or Insert Holdings
         for symbol, holding in domain_account.holdings.items():
-            # Safely extract quantity and avg_price whether your domain uses dicts or objects
             quantity = holding.quantity if hasattr(holding, 'quantity') else holding.get('quantity', 0)
             avg_price = holding.avg_price if hasattr(holding, 'avg_price') else holding.get('avg_price', Decimal("0.0"))
 
-            # Check if this holding already exists in the database
             holding_model = self.session.query(HoldingModel).filter(
                 HoldingModel.account_id == domain_account.id,
                 HoldingModel.symbol == symbol
             ).first()
 
             if holding_model:
-                # Update existing holding
                 holding_model.quantity = quantity
                 holding_model.avg_price = avg_price
             else:
-                # Insert brand new holding
                 new_holding = HoldingModel(
                     account_id=domain_account.id,
                     symbol=symbol,
@@ -93,8 +88,6 @@ class AccountRepository:
                     avg_price=avg_price
                 )
                 self.session.add(new_holding)
-
-        # 4. Save everything to PostgreS
         self.session.commit()
 
 

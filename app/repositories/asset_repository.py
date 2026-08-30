@@ -19,7 +19,7 @@ class AssetRepository:
         if not asset:
             return None
         if cast(AssetType,asset.asset_type) == AssetType.STOCK:
-            return Stock(cast(str, asset.company_name), cast(str, asset.symbol), "Unknown")
+            return Stock(cast(str, asset.company_name), cast(str, asset.symbol), sector=cast(str,asset.sector))
         else:
-            return Bond(symbol=cast(str, asset.symbol), name=cast(str, asset.company_name),coupon_rate=Decimal("0.0"))
+            return Bond(symbol=cast(str, asset.symbol), name=cast(str, asset.company_name),coupon_rate=cast(Decimal,asset.coupon_rate))
         
