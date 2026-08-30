@@ -2,11 +2,7 @@ from pydantic import BaseModel,Field
 from decimal import Decimal
 from enum import Enum
 from app.domain.order import OrderType,OrderSide
-
-    
-class AssetType(str, Enum):
-    STOCK = "STOCK"
-    BOND = "BOND"
+from app.domain.asset import AssetType
 
 class OrderCreate(BaseModel):
     symbol:str

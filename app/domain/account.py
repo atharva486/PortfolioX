@@ -1,5 +1,5 @@
 from decimal import Decimal
-from app.domain.order import Order,OrderType
+from app.domain.order import Order,OrderType,OrderSide
 from app.domain.exceptions import InsufficientFundsError, InsufficientHoldingsError
 class Account():
     def __init__(self,balance:Decimal,id:int):
@@ -12,7 +12,7 @@ class Account():
             return False
         symbol = order.asset.symbol
         total_cost = order.quantity * current_market_price
-        if order.order_type== OrderType.BUY:
+        if order.order_side== OrderSide.BUY:
             if total_cost > self.balance:
                 raise InsufficientFundsError("Insufficient funds to execute the order.")
             self.balance -= total_cost
@@ -22,7 +22,7 @@ class Account():
                 self.holdings[symbol]["avg_price"] = new_avg_price
             else:
                 self.holdings[symbol] = {"quantity": order.quantity, "avg_price": Decimal(current_market_price), "asset":order.asset}
-        elif order.order_type == OrderType.SELL:
+        elif order.order_side == OrderSide.SELL:
             if symbol not in self.holdings or self.holdings[symbol]["quantity"] < order.quantity:
                 raise InsufficientHoldingsError("Insufficient holdings to execute the sell order.")
             self.balance += total_cost
