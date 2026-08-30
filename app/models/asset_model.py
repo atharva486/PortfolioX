@@ -13,11 +13,11 @@ class AssetModel(Base):
 
     __table_args__=(
         CheckConstraint(
-            f"NOT ( asset_type == '{AssetType.STOCK}' AND sector IS NULL)",
+            f"NOT ( asset_type = '{AssetType.STOCK.value}' AND sector IS NULL)",
             name = "check_asset_has_sector"
         ),
         CheckConstraint(
-            f"NOT ( asset_type == '{AssetType.BOND}' AND coupon_rate IS NULL)",
+            f"NOT ( asset_type = '{AssetType.BOND.value}' AND coupon_rate IS NULL)",
             name = "check_asset_has_couponRate"
         )
     )
