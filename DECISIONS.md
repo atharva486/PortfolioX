@@ -48,3 +48,17 @@ Alembic executes sequential schema updates (DDL) wrapped inside stateful transac
 
 ## C. Deployment Resource Cleanup via Single-Use Connections (SQLAlchemy Pool: OFF / NullPool)
 Migrations are short-lived, single-user administrative tasks rather than long-running web servers. Forcing SQLAlchemy to use `NullPool` combined with Neon’s direct URL ensures that Alembic opens exactly one private, uninterrupted TCP connection directly to the Postgres engine and immediately terminates it upon completion, preventing dangling connections and resource leaks.
+
+## PORTX-14: Fixing Concurrent Order Race Conditions
+
+**The Problem (Double-Spend):**
+When firing concurrent orders using `asyncio.gather`, both requests read the account balance before either committed the transaction. Here was the actual output of the exploit:
+- Result Request A: 200 - {"status":"FILLED","new_balance":"100.0"}
+- Result Request B: 200 - {"status":"FILLED","new_balance":"100.0"}
+The user successfully bought $1800 of stock with a $1000 balance.
+
+**The Solution:**
+Added `.with_for_update()` to the SQLAlchemy query when fetching the account. This acquires a row-level lock (SELECT ... FOR UPDATE) in PostgreSQL, forcing concurrent requests to wait their turn.
+
+**Note on Deadlocks (PORTX-15 Prep):**
+Because our `save()` method touches both the Account row and potentially Holding rows, we risk deadlocks if concurrent transactions lock rows in different orders (e.g., TxA locks Account then Holding; TxB locks Holding then Account). Moving forward, we must ensure a consistent lock ordering (always lock Account first, then Holding) to prevent circular waits.

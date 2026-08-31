@@ -39,7 +39,7 @@ class AccountRepository:
         return account_db
 
     def get_account(self,account_id:int)->AccountModel:
-        return self.session.query(AccountModel).filter(AccountModel.id == account_id).first()
+        return self.session.query(AccountModel).filter(AccountModel.id == account_id).with_for_update().first()
 
     def get_all_accounts(self)->list[AccountModel]:
         return self.session.query(AccountModel).all()
