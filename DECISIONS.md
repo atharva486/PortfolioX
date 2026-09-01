@@ -47,6 +47,19 @@
 * **The Solution:** Added `.with_for_update()` to the SQLAlchemy query when fetching the account prior to placing an order.
 * **Consequence:** This acquires a pessimistic row-level lock (`SELECT ... FOR UPDATE`) in PostgreSQL. Concurrent requests are forced to wait their turn, read the newly updated balance, and correctly fail with `InsufficientFundsError`.
 
-## ADR-010: Deadlock Prevention Strategy (PORTX-15 Prep)
-* **Context:** Because our `save()` method touches both the Account row and potentially Holding rows, we risk database deadlocks if concurrent transactions lock rows in different sequences (e.g., Trade A locks Account then Holding; Trade B locks Holding then Account).
-* **Decision:** Moving forward, we must ensure a strict, consistent lock ordering strategy across the entire persistence layer to prevent circular database waits.
+## ADR-010: Database Concurrency & Deadlock Prevention (PORTX-14 & PORTX-15)
+
+* **The Problem (Race Conditions & Deadlocks):** 
+  High-frequency concurrent trading can cause two critical database failures:
+  1. **Double-Spends:** Concurrent requests reading the same starting balance before either commits.
+  2. **Deadlocks:** Concurrent transactions locking tables in different sequences, causing an infinite circular wait that crashes the database.
+
+* **The Decision (Consistent Pessimistic Locking & Gateway Locks):** 
+  We rely on PostgreSQL row-level pessimistic locking via SQLAlchemy's `.with_for_update()`. 
+  To prevent deadlocks, we enforce a **Strict Lock Ordering Rule**:
+  
+  **Rule:** *Any transaction touching both the `accounts` table and the `holdings` table MUST acquire the lock on the `accounts` row first (The Gateway Lock).* 
+
+* **Consequence:** 
+  1. `.with_for_update()` forces concurrent requests to wait in line, preventing Double-Spends.
+  2. Enforcing the Gateway Lock (Account first) serializes all operations for a specific user. Because no two transactions can access a user's holdings without holding the Account lock first, circular waits between holdings are mathematically impossible.
