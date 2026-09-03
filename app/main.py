@@ -4,10 +4,12 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.api.routes.accounts import router as account_router
 from app.api.routes.orders import router as order_router
+from app.api.routes.market import router as market_router
 app = FastAPI()
 
 app.include_router(account_router)
 app.include_router(order_router)
+app.include_router(market_router)
 
 @app.get("/health")
 def get_root():
