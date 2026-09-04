@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class MarketDataService:
     def __init__(self):
-        self.api_key = os.getenv("FINNHUB_API_KEY")
+        self.api_key = os.getenv("FINHUB_API_KEY")
         self.base_url = "https://finnhub.io/api/v1"
 
     async def get_price(self, symbol: str) -> Decimal | None:
@@ -64,8 +64,10 @@ class MarketDataService:
 
     async def search_assets(self, query: str) -> list[AssetSearchRequest]:
         """Searches Finnhub for matching company names or tickers."""
+        print(f"🕵️ DEBUG: API Key Loaded? -> {self.api_key}")
         if not self.api_key:
             return []
+        
 
         async with httpx.AsyncClient() as client:
             try:
@@ -76,6 +78,7 @@ class MarketDataService:
                 )
                 response.raise_for_status()
                 data = response.json()
+                print(f"🕵️ DEBUG: Finnhub Raw Data -> {data}")
                 
                 results = data.get("result", [])
                 
@@ -96,5 +99,10 @@ class MarketDataService:
                 
                 return formatted_results
             except Exception as e:
+                import traceback
+                print(f"🚨 BOOM: Search failed for '{query}'")
+                print(f"🚨 Error Details: {repr(e)}")
+                traceback.print_exc()
+                
                 logger.error(f"Search failed for '{query}': {e}")
                 return []
