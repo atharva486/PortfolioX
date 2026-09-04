@@ -16,39 +16,32 @@ from decimal import Decimal
 router = APIRouter(tags=["Orders"])
 
 
-@router.post('/accounts/{account_id}/orders/{symbol}/{order_side}/{order_type}/{quantity}', response_model=OrderResponse)
+@router.post('/accounts/{account_id}/orders', response_model=OrderResponse)
 async def place_order_endpoint(
     account_id: int,
-    symbol: str,
-    order_side: int,   # 0 = BUY, 1 = SELL
-    order_type: int,   # 0 = MARKET, 1 = LIMIT
-    quantity: int,
-    db: Session = Depends(get_db),
-    limit_price: Decimal | None = None
+    order_in: OrderCreate,
+    db: Session = Depends(get_db)
 ):
-    # Map int flags → domain enums
-    side = OrderSide.BUY if order_side == 0 else OrderSide.SELL
-    otype = OrderType.MARKET if order_type == 0 else OrderType.LIMIT
 
     order_repo = OrderRepository(db)
     asset_repo = AssetRepository(db)
     market_service = MarketDataService()
     
     # 1. Fetch live price
-    live_price = await market_service.get_price(symbol)
+    live_price = await market_service.get_price(order_in.symbol)
     if live_price is None:
         raise HTTPException(status_code=404, detail="Live price not found for the given symbol")
 
     # 2. Just-In-Time Asset Creation (If missing from DB)
-    asset = asset_repo.get_asset(symbol)
+    asset = asset_repo.get_asset(order_in.symbol)
     if not asset:
         # Search Finnhub for the missing asset details
-        search_results = await market_service.search_assets(symbol)
+        search_results = await market_service.search_assets(order_in.symbol)
         
         # Find the exact symbol match
-        exact_match = next((res for res in search_results if res.symbol.upper() == symbol.upper()), None)
+        exact_match = next((res for res in search_results if res.symbol.upper() == order_in.symbol.upper()), None)
         if not exact_match:
-            raise HTTPException(status_code=404, detail=f"Asset {symbol} does not exist in market data.")
+            raise HTTPException(status_code=404, detail=f"Asset {order_in.symbol} does not exist in market data.")
             
         # Build the domain entity and save it to the DB
         if exact_match.asset_type == AssetType.STOCK:
@@ -58,16 +51,19 @@ async def place_order_endpoint(
             
         asset_repo.save(new_asset)
 
+
     # 3. Place the actual order
     try:
+        side = OrderSide.BUY if order_in.side == 0 else OrderSide.SELL
+        order_type = OrderType.MARKET if order_in.order_type == 0 else OrderType.LIMIT
         result = order_repo.place_order(
             live_price=live_price,
-            symbol=symbol,
+            symbol=order_in.symbol,
             account_id=account_id,
             order_side=side,
-            limit_price=limit_price,
-            order_type=otype,
-            quantity=quantity
+            limit_price=order_in.limit_price,
+            order_type=order_type,
+            quantity=order_in.quantity
         )
         
         if result is None:
