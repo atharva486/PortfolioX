@@ -63,3 +63,14 @@
 * **Consequence:** 
   1. `.with_for_update()` forces concurrent requests to wait in line, preventing Double-Spends.
   2. Enforcing the Gateway Lock (Account first) serializes all operations for a specific user. Because no two transactions can access a user's holdings without holding the Account lock first, circular waits between holdings are mathematically impossible.
+
+
+## ADR-011: Live Market Data & Async Concurrency (PORTX-16)
+
+* **The Problem:** The app relied on hardcoded prices passed by the client. Real-time portfolio valuation requires fetching live market data for multiple holdings simultaneously. Fetching 10 assets sequentially took ~11 seconds, causing unacceptable UI latency.
+* **The Decision:** We implemented a dedicated `MarketDataService` using `httpx` to fetch live prices from the Finnhub API. For portfolio valuations, we utilize `asyncio.gather()` to fetch all holding prices concurrently. 
+* **Error Handling:** The service degrades gracefully. If one ticker fails, it logs the error and returns the successful prices rather than crashing the batch request. We also implemented Just-In-Time (JIT) asset creation in the database if an asset doesn't exist locally.
+* **Proof of Concept (Benchmark):** 
+  * Sequential Fetch (10 symbols): 10.89 seconds
+  * Concurrent Fetch (10 symbols): 1.37 seconds
+  * Result: **8.0x faster** using `asyncio.gather()`.
