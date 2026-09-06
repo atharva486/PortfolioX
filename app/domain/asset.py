@@ -4,6 +4,7 @@ from enum import Enum
 class AssetType(Enum):
     STOCK = "Stock"
     BOND = "Bond"
+    
 class Asset(ABC):
 
     @property
