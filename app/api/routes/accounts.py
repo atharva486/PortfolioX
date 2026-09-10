@@ -5,7 +5,7 @@ from sqlalchemy import text
 from app.schemas.account_schema import CreateAccountRequest,AccountResponse
 from app.repositories.account_repository import AccountRepository
 
-router = APIRouter()
+router = APIRouter(tags=['Accounts'])
 
 @router.post("/accounts")
 def create_account(account:CreateAccountRequest, db:Session=Depends(get_db)):
