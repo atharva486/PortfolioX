@@ -74,3 +74,5 @@
   * Sequential Fetch (10 symbols): 10.89 seconds
   * Concurrent Fetch (10 symbols): 1.37 seconds
   * Result: **8.0x faster** using `asyncio.gather()`.
+
+"Current AI integration sends full account/holdings data to Gemini's free-tier API for tool-calling. A production-grade version would require: (1) data minimization — computing specific answers backend-side rather than sending raw data, (2) an enterprise API tier with a signed DPA guaranteeing no training-data usage, (3) explicit user consent before enabling AI features, and (4) audit logging of all LLM data exchanges."

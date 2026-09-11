@@ -10,9 +10,10 @@ if "sqlite" in DATABASE_URL:
     engine_args["check_same_thread"] = False
 
 engine = create_engine(
-    
     DATABASE_URL, 
     connect_args=engine_args,
+    pool_pre_ping=True,
+    pool_recycle=300,
     echo=False
 )
 
