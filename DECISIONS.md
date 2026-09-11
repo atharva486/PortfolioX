@@ -75,4 +75,9 @@
   * Concurrent Fetch (10 symbols): 1.37 seconds
   * Result: **8.0x faster** using `asyncio.gather()`.
 
-"Current AI integration sends full account/holdings data to Gemini's free-tier API for tool-calling. A production-grade version would require: (1) data minimization — computing specific answers backend-side rather than sending raw data, (2) an enterprise API tier with a signed DPA guaranteeing no training-data usage, (3) explicit user consent before enabling AI features, and (4) audit logging of all LLM data exchanges."
+## ADR-012: AI Assistant Layer via Gemini Function-Calling (PORTX-30)
+
+* **The Goal:** Allow natural-language queries against real portfolio and market data, rather than requiring users to know specific API endpoints.
+* **The Decision:** Built an AI assistant layer using Google's Gemini API with function-calling (tool-use). The model is given tool definitions (`get_portfolio`, `get_live_price`) mapped directly to existing repository/service functions — no business logic is duplicated. When a user asks a question, Gemini decides which tool to call, our backend executes it against the real database/market-data service, and the result is returned to Gemini to generate a grounded natural-language response.
+* **Security/Data-Minimization Tradeoff (known limitation):** Current implementation sends account balance and holdings data to Gemini's free-tier API as part of tool-calling. A production-grade version would require: (1) data minimization — computing specific answers backend-side rather than sending raw data, (2) an enterprise API tier with a signed Data Processing Addendum guaranteeing no training-data usage, (3) explicit user consent before enabling AI features, and (4) full audit logging of all LLM data exchanges (currently only tool name + arguments are logged, not result payloads).
+* **Consequence:** Delivers a working, demoable natural-language interface reusing 100% of existing domain/repository logic, with an explicit system-prompt safety rule preventing the model from executing ambiguous actions. The data-handling gaps above are consciously deferred, not overlooked, and documented here for future hardening.
