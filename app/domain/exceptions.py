@@ -22,3 +22,7 @@ class InsufficientHoldingsError(PortfolioXError):
 class MissingPriceError(PortfolioXError):
     """Raised when a live price for a symbol is not available."""
     pass
+
+class AccountNotFoundError(PortfolioXError):
+    """Raised when an account is not found in the database."""
+    pass

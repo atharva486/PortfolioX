@@ -17,21 +17,21 @@ you can only help with portfolio questions right now."""
 get_portfolio_fn = types.FunctionDeclaration(
     name="get_portfolio",
     description="Get current holdings and cash balance for a trading account.",
-    parameters={
-        "type": "object",
-        "properties": {"account_id": {"type": "integer"}},
-        "required": ["account_id"],
-    },
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={"account_id": types.Schema(type=types.Type.INTEGER)},
+        required=["account_id"],
+    ),
 )
 
 get_live_price_fn = types.FunctionDeclaration(
     name="get_live_price",
     description="Get the current live market price for a stock symbol.",
-    parameters={
-        "type": "object",
-        "properties": {"symbol": {"type": "string"}},
-        "required": ["symbol"],
-    },
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={"symbol": types.Schema(type=types.Type.STRING, description="Stock symbol to look up")},
+        required=["symbol"],
+    ),
 )
 
 TOOLS = types.Tool(function_declarations=[get_portfolio_fn, get_live_price_fn])
@@ -67,7 +67,15 @@ class AIChatService:
                 contents=contents,
                 config=config,
             )
+            if not response.candidates or not response.candidates[0].content:
+                raise RuntimeError("No candidates returned from Gemini API.")
             candidate = response.candidates[0]
+
+            if not candidate.content:
+                raise RuntimeError("No content parts returned from Gemini API.")     
+
+            if not candidate.content.parts:
+                raise RuntimeError("No content parts returned from Gemini API.")       
             function_calls = [
                 p.function_call for p in candidate.content.parts if p.function_call
             ]
@@ -81,6 +89,10 @@ class AIChatService:
             contents.append(candidate.content)
             function_response_parts = []
             for fc in function_calls:
+                if not fc.name or not fc.args:
+                    raise RuntimeError(
+                        "Function call missing name or args in Gemini API response."
+                    )
                 actions_taken.append(f"{fc.name}({dict(fc.args)})")
                 logger.info(
                     f"AI_TOOL_CALL account_id={account_id} tool={fc.name} args={dict(fc.args)}"

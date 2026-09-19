@@ -1,3 +1,4 @@
+from app.domain.exceptions import AccountNotFoundError
 from app.repositories.account_repository import AccountRepository
 from app.services.market_data_services import MarketDataService
 
@@ -15,7 +16,7 @@ async def execute_tool(tool_name: str, tool_input: dict, db) -> dict:
         account_repo = AccountRepository(db)
         account = account_repo.get_domain_account(tool_input["account_id"])
         if account is None:
-            return {"error": "Account not found"}
+            raise AccountNotFoundError(f"Account with ID {tool_input['account_id']} not found.")
 
         holdings_summary = [
             {
@@ -34,7 +35,7 @@ async def execute_tool(tool_name: str, tool_input: dict, db) -> dict:
         market = MarketDataService()
         price = await market.get_price(tool_input["symbol"])
         if price is None:
-            return {"error": f"Could not fetch price for {tool_input['symbol']}"}
+            raise ValueError(f"Live price for symbol {tool_input['symbol']} not found.")
         return {"symbol": tool_input["symbol"], "price": str(price)}
 
-    return {"error": f"Unknown tool: {tool_name}"}
+    raise ValueError(f"Unknown tool name: {tool_name}")
