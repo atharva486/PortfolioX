@@ -63,11 +63,12 @@ class AccountRepository:
         raw_account  = self.get_account(account_id = account_id)
         return self._to_domain(account=raw_account)
 
-    def save(self,domain_account:Account):
+    def save(self, domain_account: Account):
         account = self.get_account(domain_account.id)
         if not account:
             return None
-        account.balance =domain_account.balance
+        account.balance = domain_account.balance
+
         for symbol, holding in domain_account.holdings.items():
             quantity = holding.quantity if hasattr(holding, 'quantity') else holding.get('quantity', 0)
             avg_price = holding.avg_price if hasattr(holding, 'avg_price') else holding.get('avg_price', Decimal("0.0"))
@@ -77,17 +78,25 @@ class AccountRepository:
                 HoldingModel.symbol == symbol
             ).first()
 
-            if holding_model:
+            if quantity == 0:
+                # Full sell — remove the row entirely
+                if holding_model:
+                    self.session.delete(holding_model)
+            elif holding_model:
+                # Existing holding — update in place
                 holding_model.quantity = quantity
                 holding_model.avg_price = avg_price
             else:
+                # New holding — insert
                 new_holding = HoldingModel(
                     account_id=domain_account.id,
                     symbol=symbol,
                     quantity=quantity,
-                    avg_price=avg_price
+                    avg_price=avg_price,
                 )
                 self.session.add(new_holding)
+
         self.session.commit()
+
 
 

@@ -1,3 +1,4 @@
+import asyncio
 import os
 import logging
 
@@ -6,6 +7,8 @@ from google.genai import types
 from sqlalchemy.orm import Session
 
 from app.services.ai_tools import execute_tool
+from decimal import Decimal
+from typing import Any
 
 logger = logging.getLogger("ai_audit")
 
@@ -19,7 +22,10 @@ get_portfolio_fn = types.FunctionDeclaration(
     description="Get current holdings and cash balance for a trading account.",
     parameters=types.Schema(
         type=types.Type.OBJECT,
-        properties={"account_id": types.Schema(type=types.Type.INTEGER)},
+        properties={
+            "account_id": types.Schema(type=types.Type.INTEGER),
+            
+        },
         required=["account_id"],
     ),
 )
@@ -34,14 +40,61 @@ get_live_price_fn = types.FunctionDeclaration(
     ),
 )
 
-TOOLS = types.Tool(function_declarations=[get_portfolio_fn, get_live_price_fn])
+place_order_fn = types.FunctionDeclaration(
+    name  ="place_order",
+    description="Place a buy or sell order for a stock symbol.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "account_id": types.Schema(
+                type=types.Type.INTEGER,
+                description="The account ID to place the order for.",
+            ),
+            "symbol": types.Schema(
+                type=types.Type.STRING, description="The stock symbol to trade."
+            ),
+            "order_type": types.Schema(
+                type=types.Type.STRING,
+                enum=["0", "1"],
+                description="Type of order: '0' for MARKET, '1' for LIMIT.",
+            ),
+            "quantity": types.Schema(
+                type=types.Type.NUMBER,
+                description="The number of shares to buy or sell.",
+            ),
+            "order_side": types.Schema(
+                type=types.Type.STRING,
+                enum=["0", "1"],
+                description="Side of order: '0' for BUY, '1' for SELL.",
+            ),
+        },
+        required=["account_id", "symbol", "order_type", "quantity","order_side"],
+    ),
+)
+
+TOOLS = types.Tool(function_declarations=[get_portfolio_fn, get_live_price_fn, place_order_fn])
+
+
 
 
 class AIChatService:
     """Encapsulates the Gemini chat loop and tool-calling orchestration."""
 
+    MODEL_FALLBACKS = ["gemini-3.8-flash"]
+
     def __init__(self):
         self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+
+    def convert_decimals(self,obj:Any)->Any:
+        """Recursively converts any Decimal values to float (or str) so JSON serialization works."""
+        if isinstance(obj, dict):
+            return {k: self.convert_decimals(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self.convert_decimals(i) for i in obj]
+        elif isinstance(obj, Decimal):
+            # Use float(obj) for numbers, or str(obj) if you want exact string precision
+            return float(obj)
+        return obj
 
     async def chat(self, account_id: int, message: str, db: Session) -> tuple[str, list[str]]:
         """
@@ -62,11 +115,27 @@ class AIChatService:
         )
 
         while True:
-            response = self.client.models.generate_content(
-                model="gemini-3.6-flash",
-                contents=contents,
-                config=config,
-            )
+            response = None
+            last_error = None
+            for model_name in self.MODEL_FALLBACKS:
+                for attempt in range(5):  # retry up to 5 times
+                    try:
+                        response = await self.client.aio.models.generate_content(
+                            model=model_name,
+                            contents=contents,
+                            config=config,
+                        )
+                        break  # success
+                    except Exception as e:
+                        last_error = e
+                        wait = min(2 ** attempt, 30)  # backoff: 1, 2, 4, 8, 16s (capped at 30)
+                        logger.warning(f"Model {model_name} attempt {attempt+1} failed — retrying in {wait}s: {e}")
+                        await asyncio.sleep(wait)
+                if response:
+                    break
+            if not response:
+                raise RuntimeError(f"All models failed. Last error: {last_error}")
+
             if not response.candidates or not response.candidates[0].content:
                 raise RuntimeError("No candidates returned from Gemini API.")
             candidate = response.candidates[0]
@@ -98,9 +167,10 @@ class AIChatService:
                     f"AI_TOOL_CALL account_id={account_id} tool={fc.name} args={dict(fc.args)}"
                 )
                 result = await execute_tool(fc.name, dict(fc.args), db)
+                clean_result  =self.convert_decimals(result)
                 function_response_parts.append(
                     types.Part.from_function_response(
-                        name=fc.name, response={"result": result}
+                        name=fc.name, response={"result": clean_result}
                     )
                 )
             contents.append(

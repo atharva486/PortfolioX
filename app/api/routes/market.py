@@ -14,3 +14,10 @@ async def search_symbols(
     service: MarketDataService = Depends(get_market_service)
 ):
     return await service.search_assets(query)
+
+@router.get("/live_prices", response_model=list[AssetSearchRequest])
+async def get_live_prices(
+    query: str = Query(..., min_length=1, description="Type a company name or ticker symbol"),
+    service: MarketDataService = Depends(get_market_service)
+):
+    return await service.get_price(query)
