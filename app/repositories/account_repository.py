@@ -69,25 +69,28 @@ class AccountRepository:
             return None
         account.balance = domain_account.balance
 
+        # Track what symbols currently exist in the domain model
+        domain_symbols = set(domain_account.holdings.keys())
+
+        # Load all existing holding rows from the database for this account
+        existing_holdings = self.session.query(HoldingModel).filter(
+            HoldingModel.account_id == domain_account.id
+        ).all()
+        
+        # Create a dictionary for fast lookup of existing database holdings
+        existing_holdings_dict = {h.symbol: h for h in existing_holdings}
+
+        # 1. Update existing rows or insert new ones
         for symbol, holding in domain_account.holdings.items():
             quantity = holding.quantity if hasattr(holding, 'quantity') else holding.get('quantity', 0)
             avg_price = holding.avg_price if hasattr(holding, 'avg_price') else holding.get('avg_price', Decimal("0.0"))
 
-            holding_model = self.session.query(HoldingModel).filter(
-                HoldingModel.account_id == domain_account.id,
-                HoldingModel.symbol == symbol
-            ).first()
-
-            if quantity == 0:
-                # Full sell — remove the row entirely
-                if holding_model:
-                    self.session.delete(holding_model)
-            elif holding_model:
-                # Existing holding — update in place
-                holding_model.quantity = quantity
-                holding_model.avg_price = avg_price
+            if symbol in existing_holdings_dict:
+                # Update existing holding
+                existing_holdings_dict[symbol].quantity = quantity
+                existing_holdings_dict[symbol].avg_price = avg_price
             else:
-                # New holding — insert
+                # Insert new holding
                 new_holding = HoldingModel(
                     account_id=domain_account.id,
                     symbol=symbol,
@@ -95,6 +98,12 @@ class AccountRepository:
                     avg_price=avg_price,
                 )
                 self.session.add(new_holding)
+
+        # 2. Delete any database holding rows that are NO LONGER in the domain model
+        # (This happens when we sell all shares and the quantity drops to 0)
+        for symbol, holding_model in existing_holdings_dict.items():
+            if symbol not in domain_symbols:
+                self.session.delete(holding_model)
 
         self.session.commit()
 

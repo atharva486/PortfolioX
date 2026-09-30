@@ -102,3 +102,30 @@ def test_get_domain_account_and_place_order(db_session):
     assert domain_account.holdings["AAPL"]["quantity"] == Decimal("15")
 
     print("\n✅ THE MAPPER WORKS! Domain Logic successfully ran on Database Data.")
+
+    partial_sell_order = MarketOrder(
+        asset=new_apple_stock, 
+        quantity=5, 
+        order_side=OrderSide.SELL
+    )
+    
+    domain_account.place_order(order=partial_sell_order, current_market_price=Decimal("200.00"))
+    
+    assert domain_account.balance == Decimal("10200.00") # 9200 + (5 * 200)
+    assert domain_account.holdings["AAPL"]["quantity"] == Decimal("10") # 15 - 5
+
+    # 5. NEW TEST: FULL SELL (Sell remaining 10 shares - triggers `del`)
+    full_sell_order = MarketOrder(
+        asset=new_apple_stock, 
+        quantity=10, 
+        order_side=OrderSide.SELL
+    )
+    
+    domain_account.place_order(order=full_sell_order, current_market_price=Decimal("200.00"))
+    
+    assert domain_account.balance == Decimal("12200.00") # 10200 + (10 * 200)
+    
+    # ✅ Because of 'del self.holdings[symbol]', "AAPL" must NOT be in the dictionary anymore
+    assert "AAPL" not in domain_account.holdings 
+
+    print("\n✅ THE MAPPER WORKS! Buy, Partial Sell, and Full Deletion logic all passed.")
