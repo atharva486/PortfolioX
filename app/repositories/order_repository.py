@@ -1,41 +1,71 @@
-
+from dataclasses import dataclass
 from decimal import Decimal
-from typing import cast
 
 from sqlalchemy.orm import Session
-from app.domain.account import Account
-from app.models.account_model import AccountModel
-from app.domain.asset import Asset,Stock,Bond
-from app.models.asset_model import AssetModel
-from app.models.holding_model import HoldingModel
+
+from app.domain.asset import Asset
+from app.domain.order import LimitOrder, MarketOrder, Order, OrderSide, OrderType
 from app.repositories.account_repository import AccountRepository
-from app.domain.order import OrderSide,LimitOrder,MarketOrder,OrderType
 from app.repositories.asset_repository import AssetRepository
 
+
+@dataclass
+class OrderOutcome:
+    """Result of an execution attempt. Typed instead of a bare dict so
+    callers cannot silently read a missing key."""
+
+    filled: bool
+    new_balance: Decimal
+    filled_price: Decimal | None
+
+
 class OrderRepository:
-    def __init__(self,session:Session):
-        self.session =session
+    def __init__(self, session: Session) -> None:
+        self.session = session
 
-    def create_order(self,order_type:OrderType,quantity:int,order_side:OrderSide,limit_price:Decimal|None,asset:Asset):
+    def create_order(
+        self,
+        order_type: OrderType,
+        quantity: int,
+        order_side: OrderSide,
+        limit_price: Decimal | None,
+        asset: Asset,
+    ) -> Order:
+        # NOTE (ADR pending): a LIMIT order with limit_price=None silently
+        # falls through to a MarketOrder here. That should be rejected at the
+        # API boundary instead — see app/schemas/order_schema.py.
         if order_type == OrderType.LIMIT and limit_price is not None:
-            return LimitOrder(asset,quantity,order_side,limit_price)
+            return LimitOrder(asset, quantity, order_side, limit_price)
         else:
-            return MarketOrder(asset,quantity,order_side)
+            return MarketOrder(asset, quantity, order_side)
 
-    def place_order(self,live_price:Decimal,symbol:str,account_id:int,order_side:OrderSide,limit_price:Decimal|None,order_type:OrderType,quantity:int)->dict|None:
-        accountRepo =AccountRepository(self.session)
-        assetRepo = AssetRepository(self.session)
-        account = accountRepo.get_domain_account(account_id)
-        if account is not None:
-            if assetRepo is not None:
-                asset = assetRepo.get_asset(symbol)
-                if asset is not None:
-                    order = self.create_order(order_type,quantity,order_side,limit_price,asset)
-                    trade_success = account.place_order(order,live_price)   
-                    accountRepo.save(account)
-                    return {
-                    "status": "FILLED" if trade_success else "FAILED",
-                    "new_balance": account.balance,
-                    "filled_price": live_price if trade_success else None
-                    }
-        return None
+    def place_order(
+        self,
+        live_price: Decimal,
+        symbol: str,
+        account_id: int,
+        order_side: OrderSide,
+        limit_price: Decimal | None,
+        order_type: OrderType,
+        quantity: int,
+    ) -> OrderOutcome | None:
+        account_repo = AccountRepository(self.session)
+        asset_repo = AssetRepository(self.session)
+
+        account = account_repo.get_domain_account(account_id)
+        if account is None:
+            return None
+
+        asset = asset_repo.get_asset(symbol)
+        if asset is None:
+            return None
+
+        order = self.create_order(order_type, quantity, order_side, limit_price, asset)
+        filled = account.place_order(order, live_price)
+        account_repo.save(account)
+
+        return OrderOutcome(
+            filled=filled,
+            new_balance=account.balance,
+            filled_price=live_price if filled else None,
+        )

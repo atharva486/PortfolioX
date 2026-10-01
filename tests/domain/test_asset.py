@@ -1,6 +1,9 @@
-import pytest
 from decimal import Decimal
-from app.domain.asset import Asset, Stock, Bond, AssetType
+
+import pytest
+
+from app.domain.asset import Asset, AssetType, Bond, Stock
+
 
 def test_cannot_instantiate_base_asset():
     """PORTX-1: Verify that the abstract base class cannot be instantiated."""
@@ -8,27 +11,21 @@ def test_cannot_instantiate_base_asset():
         # This will fail because Asset has abstract methods
         Asset()
 
+
 def test_stock_initialization_and_properties():
     """Verify Stock correctly sets and returns all properties."""
-    stock = Stock(
-        name="Apple Inc.", 
-        symbol="AAPL", 
-        sector="Technology"
-    )
-    
+    stock = Stock(name="Apple Inc.", symbol="AAPL", sector="Technology")
+
     assert stock.name == "Apple Inc."
     assert stock.symbol == "AAPL"
     assert stock.sector == "Technology"
     assert stock.asset_type == AssetType.STOCK
 
+
 def test_bond_initialization_and_properties():
     """Verify Bond correctly sets and returns all properties."""
-    bond = Bond(
-        name="US Treasury 10Y", 
-        symbol="UST10Y", 
-        coupon_rate=Decimal("0.045")
-    )
-    
+    bond = Bond(name="US Treasury 10Y", symbol="UST10Y", coupon_rate=Decimal("0.045"))
+
     assert bond.name == "US Treasury 10Y"
     assert bond.symbol == "UST10Y"
     assert bond.coupon_rate == Decimal("0.045")

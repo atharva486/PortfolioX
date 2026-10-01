@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from enum import Enum
 from decimal import Decimal
+from enum import Enum
 
 from app.domain.asset import Asset
 from app.domain.exceptions import InvalidOrderError
@@ -47,7 +47,9 @@ class MarketOrder(Order):
 
 
 class LimitOrder(Order):
-    def __init__(self, asset: Asset, quantity: int, order_side: OrderSide, limit_price: Decimal):
+    def __init__(
+        self, asset: Asset, quantity: int, order_side: OrderSide, limit_price: Decimal
+    ):
         super().__init__(asset, quantity, order_side)
         self._limit_price = limit_price
 
@@ -62,5 +64,3 @@ class LimitOrder(Order):
             return current_market_price >= self._limit_price
         else:
             raise InvalidOrderError("Invalid order type.")
-
-    

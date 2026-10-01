@@ -1,12 +1,11 @@
-from fastapi import FastAPI,Depends
-from app.db.session import get_db
-from sqlalchemy import text
-from sqlalchemy.orm import Session
+from fastapi import FastAPI
+
 from app.api.routes.accounts import router as account_router
-from app.api.routes.orders import router as order_router
-from app.api.routes.market import router as market_router
-from app.api.routes.portfolio import router as portfolio_router
 from app.api.routes.ai import router as ai_router
+from app.api.routes.market import router as market_router
+from app.api.routes.orders import router as order_router
+from app.api.routes.portfolio import router as portfolio_router
+
 app = FastAPI()
 
 app.include_router(account_router)

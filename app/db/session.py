@@ -1,23 +1,25 @@
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker
 import os
-import dotenv 
+
+import dotenv
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 dotenv.load_dotenv()
-DATABASE_URL = os.environ.get("DATABASE_URL","sqlite:///portfoliox.db")
+DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///portfoliox.db")
 engine_args = {}
 if "sqlite" in DATABASE_URL:
     engine_args["check_same_thread"] = False
 
 engine = create_engine(
-    DATABASE_URL, 
+    DATABASE_URL,
     connect_args=engine_args,
     pool_pre_ping=True,
     pool_recycle=300,
-    echo=False
+    echo=False,
 )
 
-SessionLocal  = sessionmaker(autocommit = False, autoflush = False, bind = engine)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
 
 def get_db():
     db = SessionLocal()
@@ -25,4 +27,3 @@ def get_db():
         yield db
     finally:
         db.close()
-    

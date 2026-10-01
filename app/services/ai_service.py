@@ -1,14 +1,14 @@
 import asyncio
-import os
 import logging
+import os
+from decimal import Decimal
+from typing import Any
 
 from google import genai
 from google.genai import types
 from sqlalchemy.orm import Session
 
 from app.services.ai_tools import execute_tool
-from decimal import Decimal
-from typing import Any
 
 logger = logging.getLogger("ai_audit")
 
@@ -24,7 +24,6 @@ get_portfolio_fn = types.FunctionDeclaration(
         type=types.Type.OBJECT,
         properties={
             "account_id": types.Schema(type=types.Type.INTEGER),
-            
         },
         required=["account_id"],
     ),
@@ -35,13 +34,17 @@ get_live_price_fn = types.FunctionDeclaration(
     description="Get the current live market price for a stock symbol.",
     parameters=types.Schema(
         type=types.Type.OBJECT,
-        properties={"symbol": types.Schema(type=types.Type.STRING, description="Stock symbol to look up")},
+        properties={
+            "symbol": types.Schema(
+                type=types.Type.STRING, description="Stock symbol to look up"
+            )
+        },
         required=["symbol"],
     ),
 )
 
 place_order_fn = types.FunctionDeclaration(
-    name  ="place_order",
+    name="place_order",
     description="Place a buy or sell order for a stock symbol.",
     parameters=types.Schema(
         type=types.Type.OBJECT,
@@ -68,13 +71,13 @@ place_order_fn = types.FunctionDeclaration(
                 description="Side of order: '0' for BUY, '1' for SELL.",
             ),
         },
-        required=["account_id", "symbol", "order_type", "quantity","order_side"],
+        required=["account_id", "symbol", "order_type", "quantity", "order_side"],
     ),
 )
 
-TOOLS = types.Tool(function_declarations=[get_portfolio_fn, get_live_price_fn, place_order_fn])
-
-
+TOOLS = types.Tool(
+    function_declarations=[get_portfolio_fn, get_live_price_fn, place_order_fn]
+)
 
 
 class AIChatService:
@@ -85,7 +88,7 @@ class AIChatService:
     def __init__(self):
         self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 
-    def convert_decimals(self,obj:Any)->Any:
+    def convert_decimals(self, obj: Any) -> Any:
         """Recursively converts any Decimal values to float (or str) so JSON serialization works."""
         if isinstance(obj, dict):
             return {k: self.convert_decimals(v) for k, v in obj.items()}
@@ -96,7 +99,9 @@ class AIChatService:
             return float(obj)
         return obj
 
-    async def chat(self, account_id: int, message: str, db: Session) -> tuple[str, list[str]]:
+    async def chat(
+        self, account_id: int, message: str, db: Session
+    ) -> tuple[str, list[str]]:
         """
         Run a multi-turn chat with Gemini, resolving any tool calls along the way.
 
@@ -128,8 +133,12 @@ class AIChatService:
                         break  # success
                     except Exception as e:
                         last_error = e
-                        wait = min(2 ** attempt, 30)  # backoff: 1, 2, 4, 8, 16s (capped at 30)
-                        logger.warning(f"Model {model_name} attempt {attempt+1} failed — retrying in {wait}s: {e}")
+                        wait = min(
+                            2**attempt, 30
+                        )  # backoff: 1, 2, 4, 8, 16s (capped at 30)
+                        logger.warning(
+                            f"Model {model_name} attempt {attempt + 1} failed — retrying in {wait}s: {e}"
+                        )
                         await asyncio.sleep(wait)
                 if response:
                     break
@@ -141,18 +150,16 @@ class AIChatService:
             candidate = response.candidates[0]
 
             if not candidate.content:
-                raise RuntimeError("No content parts returned from Gemini API.")     
+                raise RuntimeError("No content parts returned from Gemini API.")
 
             if not candidate.content.parts:
-                raise RuntimeError("No content parts returned from Gemini API.")       
+                raise RuntimeError("No content parts returned from Gemini API.")
             function_calls = [
                 p.function_call for p in candidate.content.parts if p.function_call
             ]
 
             if not function_calls:
-                final_text = "".join(
-                    p.text for p in candidate.content.parts if p.text
-                )
+                final_text = "".join(p.text for p in candidate.content.parts if p.text)
                 return final_text, actions_taken
 
             contents.append(candidate.content)
@@ -167,12 +174,10 @@ class AIChatService:
                     f"AI_TOOL_CALL account_id={account_id} tool={fc.name} args={dict(fc.args)}"
                 )
                 result = await execute_tool(fc.name, dict(fc.args), db)
-                clean_result  =self.convert_decimals(result)
+                clean_result = self.convert_decimals(result)
                 function_response_parts.append(
                     types.Part.from_function_response(
                         name=fc.name, response={"result": clean_result}
                     )
                 )
-            contents.append(
-                types.Content(role="user", parts=function_response_parts)
-            )
+            contents.append(types.Content(role="user", parts=function_response_parts))

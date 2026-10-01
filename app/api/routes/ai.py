@@ -16,7 +16,7 @@ ai_service = AIChatService()
 
 
 @router.post("/chat", response_model=ChatResponse)
-async def ai_chat(request: ChatRequest, db: Session = Depends(get_db)):
+async def ai_chat(request: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
     reply, actions_taken = await ai_service.chat(
         account_id=request.account_id,
         message=request.message,

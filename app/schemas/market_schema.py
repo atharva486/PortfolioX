@@ -1,6 +1,9 @@
 from decimal import Decimal
+
 from pydantic import BaseModel
+
 from app.domain.asset import AssetType  # Import your actual domain Enum
+
 
 class AssetSearchRequest(BaseModel):
     symbol: str

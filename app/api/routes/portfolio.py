@@ -1,48 +1,53 @@
-from app.schemas.account_schema import AccountResponse
-from app.schemas.portfolio_schema import PortfolioSummaryResponse,HoldingSchema
-from fastapi import APIRouter,Depends,HTTPException
-from app.db.session import get_db
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import text
-from decimal import Decimal
+
+from app.db.session import get_db
+from app.domain.exceptions import MissingPriceError
+from app.domain.portfolio import Portfolio
 from app.repositories.account_repository import AccountRepository
+from app.schemas.account_schema import AccountResponse
+from app.schemas.portfolio_schema import HoldingSchema, PortfolioSummaryResponse
 from app.services.market_data_services import MarketDataService
 
-router = APIRouter(tags=['Holdings'])
+router = APIRouter(tags=["Holdings"])
 
-@router.get('/accounts/{account_id}/portfolio',response_model = PortfolioSummaryResponse)
-async def get_portfolio(account_id:int,db:Session = Depends(get_db))->PortfolioSummaryResponse:
-    market = MarketDataService()
+
+@router.get("/accounts/{account_id}/portfolio", response_model=PortfolioSummaryResponse)
+async def get_portfolio(
+    account_id: int, db: Session = Depends(get_db)
+) -> PortfolioSummaryResponse:
     account_repo = AccountRepository(db)
-    account =account_repo.get_domain_account(account_id)
-    if account is not None:
-        id = account.id
-        balance = account.balance
-        holdings = []
-        total_pnl = Decimal("0.00")
-        
-        # Batch fetch all prices concurrently
-        symbols_to_fetch = list(account.holdings.keys())
-        live_prices = await market.get_prices(symbols_to_fetch)
-        
-        for symbol, data in account.holdings.items():
-            live_price = live_prices.get(symbol, Decimal("0.00"))
-            quantity = data.get("quantity", 0)
-            avg_price = data.get("avg_price", Decimal("0.00"))
-            
-            holdings.append(HoldingSchema(
-                symbol=symbol,
-                quantity=quantity,
-                avg_price=avg_price,
-                live_price=live_price
-            ))
-            total_pnl += (live_price - Decimal(str(avg_price))) * Decimal(str(quantity))
-            
-        total_value = sum([data.get("quantity", 0) * Decimal(str(data.get("avg_price", Decimal("0.00")))) for symbol, data in account.holdings.items()])
-        return PortfolioSummaryResponse(
-            holdings=holdings,
-            total_value=Decimal(str(total_value)),
-            total_pnl=Decimal(str(total_pnl)),
-            account=AccountResponse(id=id, balance=balance)
+    account = account_repo.get_domain_account(account_id)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
+
+    market = MarketDataService()
+    portfolio = Portfolio(account)
+
+    # Batch fetch all prices concurrently (ADR-011)
+    live_prices = await market.get_prices(list(account.holdings.keys()))
+
+    try:
+        # Valuation maths lives in the domain layer, not the route.
+        total_value = portfolio.total_value(live_prices)
+        total_pnl = portfolio.unrealized_pnl(live_prices)
+    except MissingPriceError as e:
+        # A missing price must not become a fabricated $0.00 valuation.
+        raise HTTPException(status_code=503, detail=str(e)) from e
+
+    holdings = [
+        HoldingSchema(
+            symbol=symbol,
+            quantity=position.quantity,
+            avg_price=position.avg_price,
+            live_price=live_prices.get(symbol),
         )
-    raise HTTPException(status_code=404,detail="Account not found")
+        for symbol, position in account.holdings.items()
+    ]
+
+    return PortfolioSummaryResponse(
+        holdings=holdings,
+        total_value=total_value,
+        total_pnl=total_pnl,
+        account=AccountResponse(id=account.id, balance=account.balance),
+    )
