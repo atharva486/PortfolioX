@@ -1,0 +1,36 @@
+# Build context exclusions. Everything here would be sent to the Docker
+# daemon on every build, slowing it down and bloating the context.
+#
+# venv/ is the important one: without this, your entire local virtualenv
+# (hundreds of MB, built for YOUR machine) is uploaded to the daemon on
+# every single build.
+
+.git
+.gitignore
+.github
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+venv/
+.env
+.env.*
+!.env.example
+
+*.db
+*.sqlite3
+*.log
+
+tests/
+scripts/
+docs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+coverage.xml
+
+README.md
+DECISIONS.md
+LICENSE

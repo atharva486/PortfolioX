@@ -33,3 +33,7 @@ source venv/bin/activate
 venv\Scripts\activate
 
  uvicorn app.main:app --reload
+
+# ruff format app/ tests/
+# ruff check app/ tests/ --fix
+# mypy app/

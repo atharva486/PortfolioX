@@ -1,0 +1,146 @@
+name: CI
+
+# Runs automatically on every push and every pull request.
+# There is no server to configure — GitHub provisions a fresh Ubuntu VM
+# for each run and destroys it afterwards.
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+# If you push again while a run is in flight, cancel the older one.
+# Saves minutes when you iterate on a fix.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, Types, Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      # --- Setup -----------------------------------------------------------
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip                    # reuse downloaded wheels between runs
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # --- Quality gates --------------------------------------------------
+      # Fastest and most specific checks run first, so a typo fails in
+      # 2 seconds instead of waiting for the full test suite.
+
+      - name: Lint (ruff)
+        run: ruff check app/ tests/ scripts/
+
+      - name: Check formatting
+        run: ruff format --check app/ tests/ scripts/
+
+      - name: Type check (mypy)
+        run: mypy app/
+
+      # --- Tests -----------------------------------------------------------
+      # No DATABASE_URL secret needed: these tests build their own
+      # in-memory SQLite engine and never import app/db/session.py.
+      - name: Run tests with coverage
+        run: pytest --cov=app --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+        continue-on-error: true   # a Codecov outage must not fail your build
+
+  concurrency:
+    name: Concurrency Proof (Postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    # SQLite silently ignores SELECT ... FOR UPDATE, so row-locking
+    # cannot be proven against SQLite. This job runs the integration
+    # suite against a real PostgreSQL server.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: portfoliox_test
+        ports:
+          - 5432:5432
+        # GitHub polls this healthcheck and only starts your steps once
+        # Postgres actually accepts connections. This replaces the fragile
+        # sleep-loop you would otherwise need.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify database is reachable
+        run: |
+          python -c "
+          from sqlalchemy import create_engine, text
+          import os
+          e = create_engine(os.environ['TEST_DATABASE_URL'])
+          with e.connect() as c:
+              print('Postgres version:', c.execute(text('select version()')).scalar()[:40])
+          "
+
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/portfoliox_test
+          TEST_DATABASE_URL: postgresql://test:test@localhost:5432/portfoliox_test
+        run: pytest tests/integration/ -v
+
+  build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Build only — proves the image is valid without pushing or logging in.
+      # Add `push: true` + `tags:` later, once you have a deploy target.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: portfoliox:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
