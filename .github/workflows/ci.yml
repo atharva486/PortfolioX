@@ -145,15 +145,52 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       # Build only — proves the image is valid without pushing or logging in.
-      # Add `push: true` + `tags:` later, once you have a deploy target.
+      # Add `push: true` + registry tags once you have a deploy target.
       - name: Build image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: false
+          load: true
           tags: portfoliox:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # A successful build only proves the layers assemble. This proves the
+      # application actually starts inside the image and serves traffic.
+      - name: Start container and verify it serves
+        run: |
+          docker run -d --name portfoliox-test -p 8000:8000 portfoliox:ci
+
+          # Poll /health rather than sleeping — fail fast, and the loop
+          # ends as soon as the app is ready.
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health; then
+              echo ""
+              echo "Container is healthy."
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "App never became healthy. Container logs:"
+              docker logs portfoliox-test
+              exit 1
+            fi
+            sleep 2
+          done
+
+      - name: Assert dev tooling is absent from the image
+        run: |
+          # A production image should not be able to run the test suite.
+          if docker run --rm portfoliox:ci python -c "import pytest" 2>/dev/null; then
+            echo "FAIL: pytest leaked into the production image"
+            exit 1
+          fi
+          echo "OK: no dev tooling in the production image."
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker logs portfoliox-test || true

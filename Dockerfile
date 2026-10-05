@@ -1,27 +1,24 @@
 # syntax=docker/dockerfile:1
 #
-# Multi-stage build. The builder compiles wheels; the final stage ships
-# only the runtime. Result: a much smaller image with no build tooling
-# and no dev dependencies in production.
+# Multi-stage build: the builder prepares wheels, the final stage ships
+# only the runtime. The production image contains no compiler and no dev
+# tooling (ruff, mypy, pytest are all excluded via requirements-prod.txt).
+#
+# Result: a small, hardened image that cannot accidentally run tests.
 
 # -----------------------------------------------------------------------------
-# STAGE 1 — builder: compile wheels
+# STAGE 1 — builder: resolve dependencies into wheels
 # -----------------------------------------------------------------------------
 FROM python:3.10-slim AS builder
 
 WORKDIR /build
 
-# Compiling psycopg2 requires build tools, which we deliberately do NOT
-# carry into the final image.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy only the dependency manifest first. Docker caches this layer, so
-# editing application code does NOT re-run pip install.
-COPY requirements.txt .
+# psycopg2-binary ships manylinux wheels, so no compiler is needed here
+# either. Copying the manifest first means editing app code does NOT
+# invalidate this layer.
+COPY requirements-prod.txt .
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip wheel --wheel-dir /wheels -r requirements.txt
+    && pip wheel --wheel-dir /wheels -r requirements-prod.txt
 
 # -----------------------------------------------------------------------------
 # STAGE 2 — final: runtime only
@@ -39,32 +36,37 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Runtime shared libraries only — no compiler toolchain.
+# libpq5 at runtime for psycopg2; curl for the healthcheck below.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends libpq5 curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install from the pre-built wheels, then remove the wheelhouse.
+# Install from prebuilt wheels only (--no-index guarantees no network
+# resolution happens here), then delete the wheelhouse.
 COPY --from=builder /wheels /wheels
-COPY requirements.txt .
-RUN pip install --no-index --find-links=/wheels -r requirements.txt \
+COPY requirements-prod.txt .
+RUN pip install --no-index --find-links=/wheels -r requirements-prod.txt \
     && rm -rf /wheels
 
-# Copy application code only.
+# Application code only. Tests, scripts, and docs are excluded by
+# .dockerignore so they never enter the build context.
 COPY app ./app
 COPY alembic ./alembic
 COPY alembic.ini .
 
-# Drop root. Never run a web server as root.
+# Run as a non-root user. A compromised process should not own the app.
 RUN useradd --create-home --shell /bin/bash appuser \
     && chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8000
 
-# /health should answer "is this process alive?", not "is the DB reachable?"
-# Liveness must not depend on a downstream service.
+# Liveness only: /health does NOT touch the database. A liveness probe
+# that depends on Postgres would restart the app during a DB blip,
+# turning a partial outage into a full one.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s --retries=3 \
     CMD curl -fsS http://localhost:8000/health || exit 1
 
+# --host 0.0.0.0 is required in a container. Binding to localhost would
+# make the service unreachable from outside the container.
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

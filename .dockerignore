@@ -21,6 +21,9 @@ venv/
 *.sqlite3
 *.log
 
+# The test suite and helper scripts are not in the image. The Dockerfile
+# only COPYs `app/`, `alembic/`, and `alembic.ini`, so these never enter
+# the image regardless - excluding them just trims the context upload.
 tests/
 scripts/
 docs/
@@ -34,3 +37,21 @@ coverage.xml
 README.md
 DECISIONS.md
 LICENSE
+
+# Editor / OS noise. Harmless in the image, but there is no reason to
+# upload them on every build.
+.vscode/
+.idea/
+.DS_Store
+
+# Other Python project files. If any of these ever appear at the repo
+# root, they must not silently enter the context.
+pyproject.toml
+requirements.txt
+
+# NOTE: `.dockerignore` itself and `Dockerfile` are intentionally NOT
+# listed. The build client needs to read both, and excluding them does
+# not reduce the context.
+#
+# NOTE: requirements-prod.txt is deliberately NOT excluded - the
+# Dockerfile COPYs it in two separate stages.
