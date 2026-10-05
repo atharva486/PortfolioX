@@ -85,8 +85,28 @@ class AIChatService:
 
     MODEL_FALLBACKS = ["gemini-3.8-flash"]
 
-    def __init__(self):
-        self.client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
+    def __init__(self) -> None:
+        # The client is built LAZILY, on first use, not here.
+        #
+        # Constructing it in __init__ meant `app.main` could not even be
+        # imported without GEMINI_API_KEY set, because the router module
+        # instantiated this class at import time. That broke the Docker
+        # healthcheck, /docs, and every non-AI endpoint in an environment
+        # without a key. A missing optional integration should degrade one
+        # feature, not take down the whole process.
+        self._client: genai.Client | None = None
+
+    @property
+    def client(self) -> genai.Client:
+        if self._client is None:
+            api_key = os.environ.get("GEMINI_API_KEY")
+            if not api_key:
+                raise RuntimeError(
+                    "GEMINI_API_KEY is not configured. The AI endpoints are "
+                    "unavailable; the rest of the API is unaffected."
+                )
+            self._client = genai.Client(api_key=api_key)
+        return self._client
 
     def convert_decimals(self, obj: Any) -> Any:
         """Recursively converts any Decimal values to float (or str) so JSON serialization works."""
