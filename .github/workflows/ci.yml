@@ -70,6 +70,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    # Job-level `env`, so every step below sees these variables.
+    # A step-level `env:` applies ONLY to that one step — which is why
+    # an earlier revision raised KeyError: the verification step ran
+    # before the variables existed.
+    env:
+      TEST_DATABASE_URL: postgresql://test:test@localhost:5432/portfoliox_test
+
     # SQLite silently ignores SELECT ... FOR UPDATE, so row-locking
     # cannot be proven against SQLite. This job runs the integration
     # suite against a real PostgreSQL server.
@@ -107,21 +114,27 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Verify database is reachable
+      - name: Confirm PostgreSQL is actually in use
         run: |
-          python -c "
-          from sqlalchemy import create_engine, text
+          python - <<'PY'
           import os
-          e = create_engine(os.environ['DATABASE_URL'])
-          with e.connect() as c:
-              print('Postgres version:', c.execute(text('select version()')).scalar()[:40])
-          "
+          from sqlalchemy import create_engine, text
+
+          url = os.environ["TEST_DATABASE_URL"]
+          print("Target:", url.split("@")[-1])
+
+          engine = create_engine(url)
+          with engine.connect() as conn:
+              print("Version:", conn.execute(text("SELECT version()")).scalar()[:45])
+
+          # Guard against silently falling back to SQLite, which would
+          # make this job a no-op.
+          assert engine.dialect.name == "postgresql", "Not running on PostgreSQL!"
+          print("OK: integration tests will run against real PostgreSQL.")
+          PY
 
       - name: Run integration tests
-        env:
-          DATABASE_URL: postgresql://test:test@localhost:5432/portfoliox_test
-          TEST_DATABASE_URL: postgresql://test:test@localhost:5432/portfoliox_test
-        run: pytest tests/integration/ -v
+        run: pytest tests/integration/ -v --tb=short
 
   build:
     name: Docker Build

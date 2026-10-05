@@ -1,42 +1,18 @@
 from decimal import Decimal
 from typing import cast
 
-import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from app.domain.asset import Stock
 from app.domain.order import MarketOrder, OrderSide
 from app.models.asset_model import AssetModel
-
-# Import your Base so we can create tables in memory!
-from app.models.base import Base  # Adjust this import if your Base is somewhere else
 from app.models.holding_model import HoldingModel
 from app.repositories.account_repository import AccountRepository
 
-
-# 1. THE FIXTURE: This runs before every single test
-@pytest.fixture
-def db_session():
-    # Create an engine that only lives in RAM
-    engine = create_engine(
-        "sqlite:///:memory:", connect_args={"check_same_thread": False}
-    )
-
-    # Build all the tables in the RAM database
-    Base.metadata.create_all(engine)
-
-    # Create a fresh session
-    TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    session = TestingSessionLocal()
-
-    yield session  # Pause here and hand the session to the test
-
-    # Once the test is done, close it and throw the RAM database away
-    session.close()
+# The `db_session` fixture now lives in tests/conftest.py so every test file
+# shares it, and so the backend can be switched to PostgreSQL via
+# TEST_DATABASE_URL. SQLite alone cannot prove row-locking works.
 
 
-# 2. THE TESTS
+# THE TESTS
 def test_create_account(db_session):
     # Setup
     repo = AccountRepository(db_session)
