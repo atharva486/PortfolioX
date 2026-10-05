@@ -70,7 +70,6 @@ class MarketDataService:
 
     async def search_assets(self, query: str) -> list[AssetSearchRequest]:
         """Searches Finnhub for matching company names or tickers."""
-        print(f"🕵️ DEBUG: API Key Loaded? -> {self.api_key}")
         if not self.api_key:
             return []
 
@@ -83,7 +82,6 @@ class MarketDataService:
                 )
                 response.raise_for_status()
                 data = response.json()
-                print(f"🕵️ DEBUG: Finnhub Raw Data -> {data}")
 
                 results = data.get("result", [])
 
