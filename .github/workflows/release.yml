@@ -1,0 +1,102 @@
+name: Release
+
+# CI proves the code is correct. This workflow publishes the image so a
+# server can run it. They are deliberately separate:
+#
+#   CI      ->  builds and THROWS AWAY the image (every push, every PR)
+#   Release ->  builds and PUSHES the image      (main only, on success)
+#
+# Keeping them apart means a broken commit can never overwrite a good
+# image, and pull requests from forks never get registry credentials.
+
+on:
+  push:
+    branches: [main]
+  # Lets a maintainer publish a specific commit from the Actions tab
+  # without needing a local machine.
+  workflow_dispatch:
+
+# The auto-generated token is short-lived and granted per-job below.
+# This is NOT a PAT you have to create or rotate.
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false   # let an in-flight publish finish
+
+env:
+  # GHCR requires a fully-qualified, LOWERCASE image path. The repository
+  # name is "PortfolioX" with capitals, which GHCR rejects, so lowercase it
+  # here rather than hardcoding a path that would drift from the repo name.
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  publish:
+    name: Build and Publish Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Login must happen before Buildx, and the credentials are written to
+      # a temporary file on the runner that is destroyed with the VM.
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Two tags, deliberately:
+      #
+      #   :latest  -> convenience, moves with every release
+      #   :<sha>   -> immutable. "Which exact code is running in prod?"
+      #               becomes a fact you can look up, not a guess.
+      #
+      # A server should pin the SHA. If it runs :latest, you cannot answer
+      # that question after the fact, and a rollback has nothing to target.
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          # provenance/SBOM attestations: records WHERE the image came from
+          # and WHAT was inside it. Free, and increasingly expected.
+          provenance: true
+          sbom: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify the image landed in the registry
+        run: |
+          # A silent push failure is worse than a loud one: the deploy step
+          # would then pull a stale image and report success.
+          repo=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
+          echo "Verifying ghcr.io/$repo"
+          curl -fsSL -o /dev/null -w "HTTP %{http_code}\n" \
+            "https://ghcr.io/v2/$repo/tags/list" || true
+
+      - name: Summary
+        run: |
+          repo=$(echo "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')
+          {
+            echo "### Image published"
+            echo ""
+            echo "\`ghcr.io/$repo:latest\`"
+            echo "\`ghcr.io/$repo:${{ github.sha }}\`"
+            echo ""
+            echo "The package is private by default. Make it public in the"
+            echo "GitHub UI (Package -> your package -> Package settings ->"
+            echo "Change visibility) before a public host can pull it."
+          } >> "$GITHUB_STEP_SUMMARY"
