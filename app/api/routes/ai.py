@@ -11,7 +11,7 @@ from app.services.ai_service import AIChatService
 logger = logging.getLogger("ai_audit")
 logging.basicConfig(level=logging.INFO)
 
-router = APIRouter(prefix="/ai", tags=["ai"])   
+router = APIRouter(prefix="/ai", tags=["ai"])
 
 
 # A single shared instance, created via a dependency rather than at import

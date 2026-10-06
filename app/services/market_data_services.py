@@ -13,6 +13,10 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
+# Toggle: set PRICING_MODE=sequential to force sequential fetching for comparison.
+# Default is "async" (concurrent). This exists ONLY for load-test comparison.
+PRICING_MODE = os.getenv("PRICING_MODE", "async").lower()
+
 
 class MarketDataService:
     def __init__(self):
@@ -49,14 +53,19 @@ class MarketDataService:
                 return None
 
     async def get_prices(self, symbols: list[str]) -> dict[str, Decimal]:
-        """Fetches multiple prices concurrently using asyncio.gather."""
-        # Remove duplicates to avoid redundant API calls
+        """Fetches multiple prices - concurrent (default) or sequential for benchmarking."""
         unique_symbols = list(set(symbols))
 
-        tasks = [self.get_price(sym) for sym in unique_symbols]
-        results = await asyncio.gather(*tasks)
+        if PRICING_MODE == "sequential":
+            # Sequential: await each one in order (for comparison benchmarks)
+            results = []
+            for sym in unique_symbols:
+                results.append(await self.get_price(sym))
+        else:
+            # Async (default): fire all requests concurrently
+            tasks = [self.get_price(sym) for sym in unique_symbols]
+            results = await asyncio.gather(*tasks)
 
-        # Zip symbols back to results, dropping failures
         return {
             sym: price
             for sym, price in zip(unique_symbols, results, strict=True)

@@ -1,0 +1,17 @@
+{
+  "lines_of_code": {
+    "total": 2160,
+    "app": 1170,
+    "test": 629
+  },
+  "endpoints": 11,
+  "test_functions": 20,
+  "commits": 56,
+  "dependencies": {
+    "runtime": 43,
+    "dev_only": 11,
+    "total": 54
+  },
+  "ci_estimated_seconds": 120,
+  "coverage_percent": 0.0
+}

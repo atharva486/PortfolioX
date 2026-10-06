@@ -8,4 +8,5 @@ __pycache__/
 
 docs/
 
+.env.coverage
 .env
